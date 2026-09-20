@@ -1519,8 +1519,20 @@ class MainWindow(QtWidgets.QMainWindow):
     # Callbacks
 
     def undo_shape_edit(self) -> None:
-        self._canvas_widgets.canvas.restore_last_shape()
-        self._commit_shapes(self._canvas_widgets.canvas.shapes)
+        canvas = self._canvas_widgets.canvas
+        count_before = len(canvas.shapes)
+        removed_label = canvas.shapes[-1].label if canvas.shapes else None
+        canvas.restore_last_shape()
+        self._commit_shapes(canvas.shapes)
+        # With auto_next_label the selection points at the next label to
+        # annotate; undoing a point moves it back to that point's label so
+        # the next click re-annotates it.
+        if (
+            self._config["auto_next_label"]
+            and len(canvas.shapes) < count_before
+            and removed_label is not None
+        ):
+            self._select_unique_label(label=removed_label)
 
     def tutorial(self) -> None:
         url = "https://github.com/labelmeai/labelme/tree/main/examples/tutorial"  # NOQA
@@ -1796,6 +1808,50 @@ class MainWindow(QtWidgets.QMainWindow):
         self._load_shapes(shapes, replace=True)
         self.mark_dirty()
 
+    def _select_next_auto_label(self) -> None:
+        """Position the label selection for the freshly loaded image.
+
+        An image that already carries annotations resumes after its last one
+        (wrapping around); an image without annotations restarts at the first
+        label of the list.
+        """
+        unique_label_list = self._docks.unique_label_list
+        count = unique_label_list.count()
+        if count == 0:
+            return
+        labels = [
+            unique_label_list.item(i).data(Qt.ItemDataRole.UserRole)
+            for i in range(count)
+        ]
+        base_label = next(
+            (
+                shape.label
+                for shape in reversed(self._canvas_widgets.canvas.shapes)
+                if shape.label in labels
+            ),
+            None,
+        )
+        if base_label is None:
+            self._select_unique_label(label=labels[0])
+            return
+        self._select_label_after(label=base_label)
+
+    def _select_unique_label(self, *, label: str) -> None:
+        """Select exactly `label` in the label list, if present."""
+        item = self._docks.unique_label_list.find_label_item(label=label)
+        if item is not None:
+            self._docks.unique_label_list.setCurrentItem(item)
+
+    def _select_label_after(self, *, label: str) -> None:
+        """Select the label list entry following `label`, wrapping around."""
+        unique_label_list = self._docks.unique_label_list
+        item = unique_label_list.find_label_item(label=label)
+        if item is None:
+            return
+        row = unique_label_list.indexFromItem(item).row()
+        next_item = unique_label_list.item((row + 1) % unique_label_list.count())
+        unique_label_list.setCurrentItem(next_item)
+
     def _load_flags(
         self,
         *,
@@ -1940,12 +1996,24 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_new_shape(self) -> None:
         items = self._docks.unique_label_list.selectedItems()
         text = items[0].data(Qt.ItemDataRole.UserRole) if items else None
-        if self._config["display_label_popup"] or not text:
-            entry = self._label_dialog.popup(text=text)
-        else:
+        # With auto_next_label, point mode annotates each click directly with
+        # the preselected label and then cycles to the next label, so a run of
+        # clicks walks the label list; every other case keeps the popup rules
+        # of display_label_popup.
+        auto_point = bool(text) and (
+            self._config["auto_next_label"]
+            and self._canvas_widgets.canvas.create_mode == "point"
+        )
+        skip_popup = bool(text) and (
+            auto_point or not self._config["display_label_popup"]
+        )
+        if skip_popup:
+            assert text is not None
             entry = LabelDialogEntry(
                 label=text, flags={}, group_id=None, description=""
             )
+        else:
+            entry = self._label_dialog.popup(text=text)
 
         if entry is not None and not self.validate_label(label=entry.label):
             self.show_error_message(
@@ -1979,6 +2047,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._actions.undo_last_point.setEnabled(False)
         self._actions.undo.setEnabled(True)
         self.mark_dirty()
+        if auto_point:
+            self._select_label_after(label=entry.label)
 
     def _on_inference_produced_no_shapes(self) -> None:
         self.show_status_message(
@@ -2369,6 +2439,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.mark_dirty()
         else:
             self.mark_clean()
+        if self._config["auto_next_label"]:
+            self._select_next_auto_label()
         self._actions.delete_file.setEnabled(self.has_label_file())
         self._canvas_widgets.canvas.setEnabled(True)
         # Zoom changes the live scroll positions, so resolve the intended

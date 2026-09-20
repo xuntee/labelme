@@ -1,6 +1,9 @@
 ---
 auto_save: true
 display_label_popup: true
+# Rotate to the next label of the label list (round-robin) when a new image
+# loads; point mode then annotates on click without the label popup.
+auto_next_label: false
 with_image_data: false
 keep_prev: false
 keep_prev_scale: false

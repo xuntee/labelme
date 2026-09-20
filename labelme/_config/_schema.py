@@ -114,6 +114,34 @@ SETTINGS: Final[tuple[Setting, ...]] = (
         kind="bool",
     ),
     Setting(
+        key_path=("auto_next_label",),
+        group="Drawing and canvas",
+        label=cast(
+            str,
+            QT_TRANSLATE_NOOP(
+                "SettingsDialog", "Rotate to next label on each new image"
+            ),
+        ),
+        kind="bool",
+        note=cast(
+            str,
+            QT_TRANSLATE_NOOP(
+                "SettingsDialog",
+                "Point mode annotates each click with the selected label, "
+                "without the label popup, then cycles to the next label "
+                "(wrapping around). A new image restarts at the first "
+                "label, an annotated one resumes after its last annotation, "
+                "and undo moves the selection back to the undone label.",
+            ),
+        ),
+        search_aliases=cast(
+            str,
+            QT_TRANSLATE_NOOP(
+                "SettingsDialog", "round robin rotate cycle poll 轮询 next label"
+            ),
+        ),
+    ),
+    Setting(
         key_path=("shape_color", "mode"),
         group="Drawing and canvas",
         label=cast(str, QT_TRANSLATE_NOOP("SettingsDialog", "Shape Color Mode")),
