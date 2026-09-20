@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## 7.8.0 - 2026-09-21
+
+### Added
+
+- Add "Rotate to next label on each new image" setting: in point mode each click annotates directly with the selected label (no popup) and then cycles the selection to the next label, wrapping around; a new image restarts at the first label, an already-annotated image resumes after its last annotation, and Ctrl+Z moves the selection back to the undone label. ([#2721](https://github.com/wkentaro/labelme/pull/2721))
+
+
 ## 7.7.0 - 2026-09-18
 
 ### Changed
